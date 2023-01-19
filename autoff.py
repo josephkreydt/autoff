@@ -2,7 +2,6 @@
 - Read a file that lays out the fields/format of a plaintext flat file and CSV file fields that should map to each
 - Then automatically generate a flat file based on the mapping file
 '''
-#### TO DO
 #### Handle outputJustify and outputPadCharacter in map file and in set_field function
 #### Add ability to name file based on JSON map, and ability to use variables like MMDDYYYY in the filename
 
@@ -14,8 +13,8 @@ import sys
 from pathlib import Path
 
 # variables
-json_map_file_path = 'tt_employee.json'
-output_file_path = 'tt_employee_formatted.txt'
+json_map_file_path = '1098.json'
+output_file_path = 'corrected_1098s.dat'
 current_datetime = datetime.now()
 current_date = current_datetime.strftime("%Y-%m-%d")
 current_time = current_datetime.strftime("%H:%M:%S")
@@ -25,7 +24,7 @@ logging.basicConfig(filename='auto_ff_error_log_{}.txt'.format(current_date), le
 # figure out length of string
 # if string length is greater than field length, then trim string
 # if string length is less than field length, then pad string
-def set_field(data, field_length, justify = "left", pad_char = " "):
+def set_field(data, field_length, justify, pad_char):
 	formatted_field = ''
 	string_length = len(data)
 	#logging.info('set_field function. length of data string passed in: {}'.format(string_length))
@@ -34,10 +33,10 @@ def set_field(data, field_length, justify = "left", pad_char = " "):
 	if string_length < field_length:
 		#logging.info('set_field function. string will be padded because it is shorter than output field length')
 		if justify == "left":
-			formatted_field = data.ljust(field_length)
+			formatted_field = data.ljust(field_length, pad_char)
 			#logging.info('set_field function. padding character: {}'.format(pad_char))
 		elif justify == "right":
-			formatted_field = data.rjust(field_length)
+			formatted_field = data.rjust(field_length, pad_char)
 			#logging.info('set_field function. padding character: {}'.format(pad_char))
 		else:
 			logging.error('set_field function. field must either be left or right justified')
@@ -115,6 +114,28 @@ def get_default_value(map_json, field_output_column_start_value, output_record_r
 		return ''
 	else:
 		return default_value
+
+def get_justify_value(map_json, field_output_column_start_value, output_record_row_number):
+	justify_value = 'left'
+	map_json_row_number = 'row' + str(output_record_row_number)
+	for field_value in map_json[map_json_row_number]:
+		if field_output_column_start_value == field_value['outputColumnStart']:
+			justify_value = field_value['outputJustify']
+	if justify_value is None:
+		return 'left'
+	else:
+		return justify_value
+
+def get_pad_value(map_json, field_output_column_start_value, output_record_row_number):
+	pad_value = ' '
+	map_json_row_number = 'row' + str(output_record_row_number)
+	for field_value in map_json[map_json_row_number]:
+		if field_output_column_start_value == field_value['outputColumnStart']:
+			pad_value = field_value['outputPadCharacter']
+	if pad_value is None:
+		return ''
+	else:
+		return pad_value
 
 def create_json_map_template():
 	map_template = {
@@ -288,9 +309,11 @@ try:
 									logging.error('field length invalid')
 									sys.exit('script ended due to error')
 								default_value = get_default_value(map_json, output_column_start_value, output_record_row_number=output_record_row_number)
+								justify_value = get_justify_value(map_json, output_column_start_value, output_record_row_number=output_record_row_number)
+								pad_value = get_pad_value(map_json, output_column_start_value, output_record_row_number=output_record_row_number)
 								#if default_value == '':
 									#logging.warning('no csvFieldNumber listed, and no default value given for record with outputColumnStart value of: {}. field will be blank'.format(output_column_start_value))
-								output_field = set_field(default_value, field_length)
+								output_field = set_field(default_value, field_length, justify_value, pad_value)
 								if output_field == '':
 									logging.error('issue getting value that will be written to output file. issue in record with outputColumnStart value of: {}'.format(output_column_start_value))
 									sys.exit('script ended due to error')
@@ -302,9 +325,11 @@ try:
 									logging.error('field length invalid')
 									sys.exit('script ended due to error')
 								default_value = get_default_value(map_json, output_column_start_value, output_record_row_number=output_record_row_number)
+								justify_value = get_justify_value(map_json, output_column_start_value, output_record_row_number=output_record_row_number)
+								pad_value = get_pad_value(map_json, output_column_start_value, output_record_row_number=output_record_row_number)
 								#if default_value == '':
 									#logging.warning('no csvFieldNumber listed, and no default value given for record with outputColumnStart value of: {}. field will be blank'.format(output_column_start_value))
-								output_field = set_field(default_value, field_length)
+								output_field = set_field(default_value, field_length, justify_value, pad_value)
 								if output_field == '':
 									logging.error('issue getting value that will be written to output file. issue related to record with outputColumnStart value of: {}'.format(output_column_start_value))
 									sys.exit('script ended due to error')
@@ -316,7 +341,9 @@ try:
 								if field_length == 0:
 									logging.error('field length invalid')
 									sys.exit('script ended due to error')
-								output_field = set_field(row_of_csv_data[column_to_grab_from_csv_data], field_length, 'left', ' ')
+								justify_value = get_justify_value(map_json, output_column_start_value, output_record_row_number=output_record_row_number)
+								pad_value = get_pad_value(map_json, output_column_start_value, output_record_row_number=output_record_row_number)
+								output_field = set_field(row_of_csv_data[column_to_grab_from_csv_data], field_length, justify_value, pad_value)
 								if output_field == '':
 									logging.error('issue getting value that will be written to output file. issue related to record with outputColumnStart value of: {}'.format(output_column_start_value))
 									sys.exit('script ended due to error')
